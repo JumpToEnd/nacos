@@ -34,7 +34,7 @@ import java.util.Map;
 public class ServerStatusSynchronizer implements Synchronizer {
     
     @Override
-    public void send(final String serverIP, Message msg) {
+    public void  send(final String serverIP, Message msg) {
         if (StringUtils.isEmpty(serverIP)) {
             return;
         }

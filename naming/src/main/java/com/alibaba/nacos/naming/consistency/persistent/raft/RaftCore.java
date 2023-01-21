@@ -153,6 +153,8 @@ public class RaftCore implements Closeable {
     /**
      * Init raft core.
      *
+     * 在启动的时候 会做选举
+     *
      * @throws Exception any exception during init
      */
     @PostConstruct
@@ -206,6 +208,7 @@ public class RaftCore implements Closeable {
         if (stopWork) {
             throw new IllegalStateException("old raft protocol already stop work");
         }
+        // 如果不是leader，把请求原封不动的转发到 leader
         if (!isLeader()) {
             ObjectNode params = JacksonUtils.createEmptyJsonNode();
             params.put("key", key);
@@ -230,15 +233,20 @@ public class RaftCore implements Closeable {
             } else {
                 datum.timestamp.set(getDatum(key).timestamp.incrementAndGet());
             }
-            
+
             ObjectNode json = JacksonUtils.createEmptyJsonNode();
             json.replace("datum", JacksonUtils.transferToJsonNode(datum));
             json.replace("source", JacksonUtils.transferToJsonNode(peers.local()));
-            
+
+            // 发布（核心步骤）
             onPublish(datum, peers.local());
-            
+
+            // nacos 实现的是  简化版的 raft 协议
+            // 在写完文件之后，没有同步给其他节点，而是直接写了内存
+
             final String content = json.toString();
-            
+
+            // 同步给其他节点
             final CountDownLatch latch = new CountDownLatch(peers.majorityCount());
             for (final String server : peers.allServersIncludeMyself()) {
                 if (isLeader(server)) {
@@ -381,6 +389,7 @@ public class RaftCore implements Closeable {
         
         // if data should be persisted, usually this is true:
         if (KeyBuilder.matchPersistentKey(datum.key)) {
+            // 将数据写入本地文件
             raftStore.write(datum);
         }
         
@@ -398,6 +407,8 @@ public class RaftCore implements Closeable {
             }
         }
         raftStore.updateTerm(local.term.get());
+        // 发布一个 ValueChangeEvent 事件
+        // PersistentNotifier 相应这个事件
         NotifyCenter.publishEvent(ValueChangeEvent.builder().key(datum.key).action(DataOperation.CHANGE).build());
         Loggers.RAFT.info("data added/updated, key={}, term={}", datum.key, local.term);
     }

@@ -293,7 +293,11 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      * Init service.
      */
     public void init() {
+        // 执行一个任务
+        // 5秒之后开始执行，并且每隔5秒 就执行一次 =>  clientBeatCheckTask（客户端心跳检查任务）
+        //
         HealthCheckReactor.scheduleCheck(clientBeatCheckTask);
+        // 获取 当前所有的 Cluster，然后进行设置和初始化
         for (Map.Entry<String, Cluster> entry : clusterMap.entrySet()) {
             entry.getValue().setService(this);
             entry.getValue().init();
@@ -364,12 +368,14 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      */
     public List<Instance> allIPs(List<String> clusters) {
         List<Instance> result = new ArrayList<>();
+        // 遍历所有的 cluster
         for (String cluster : clusters) {
+            //
             Cluster clusterObj = clusterMap.get(cluster);
             if (clusterObj == null) {
                 continue;
             }
-            
+            // 把cluster中的 persistentInstances 和 ephemeralInstances 都加入到结果集中
             result.addAll(clusterObj.allIPs());
         }
         return result;
@@ -382,10 +388,12 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      * @return all instance from input clusters, if clusters is empty, return all cluster
      */
     public List<Instance> srvIPs(List<String> clusters) {
+        // 如果clusters为空，就把clusterMap中所有的key都加进去
         if (CollectionUtils.isEmpty(clusters)) {
             clusters = new ArrayList<>();
             clusters.addAll(clusterMap.keySet());
         }
+
         return allIPs(clusters);
     }
     

@@ -102,12 +102,14 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
     
     @PostConstruct
     public void init() {
+        // 会初始化
         GlobalExecutor.submitDistroNotifyTask(notifier);
     }
     
     @Override
     public void put(String key, Record value) throws NacosException {
         onPut(key, value);
+        // 向其他节点同步数据
         distroProtocol.sync(new DistroKey(key, KeyBuilder.INSTANCE_LIST_KEY_PREFIX), DataOperation.CHANGE,
                 globalConfig.getTaskDispatchPeriod() / 2);
     }
@@ -130,7 +132,8 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
      * @param value record
      */
     public void onPut(String key, Record value) {
-        
+
+        // 判断是否满足key要求
         if (KeyBuilder.matchEphemeralInstanceListKey(key)) {
             Datum<Instances> datum = new Datum<>();
             datum.value = (Instances) value;
@@ -396,6 +399,7 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
             if (action == DataOperation.CHANGE) {
                 services.put(datumKey, StringUtils.EMPTY);
             }
+            // 放入到阻塞队列里
             tasks.offer(Pair.with(datumKey, action));
         }
         
@@ -409,7 +413,9 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
             
             for (; ; ) {
                 try {
+                    // 从 阻塞队列中读取
                     Pair<String, DataOperation> pair = tasks.take();
+                    // 处理
                     handle(pair);
                 } catch (Throwable e) {
                     Loggers.DISTRO.error("[NACOS-DISTRO] Error while handling notifying task", e);

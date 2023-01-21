@@ -90,7 +90,7 @@ public final class PersistentNotifier extends Subscriber<ValueChangeEvent> {
      * @param value  value
      * @param <T>    type
      */
-    public <T extends Record> void notify(final String key, final DataOperation action, final T value) {
+    public <T extends Record> void  notify(final String key, final DataOperation action, final T value) {
         if (listenerMap.containsKey(KeyBuilder.SERVICE_META_KEY_PREFIX)) {
             if (KeyBuilder.matchServiceMetaKey(key) && !KeyBuilder.matchSwitchKey(key)) {
                 for (RecordListener listener : listenerMap.get(KeyBuilder.SERVICE_META_KEY_PREFIX)) {

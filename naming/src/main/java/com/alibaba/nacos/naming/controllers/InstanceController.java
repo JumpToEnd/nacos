@@ -133,15 +133,22 @@ public class InstanceController {
     @PostMapping
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public String register(HttpServletRequest request) throws Exception {
-        
-        final String namespaceId = WebUtils
-                .optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+
+
+        // 从请求中获取 namespaceId
+        final String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        // 从请求中获取 serviceName
         final String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+
         NamingUtils.checkServiceNameFormat(serviceName);
-        
+
+        // 将请求封装成为一个 Instance （解析 请求中的各种信息）
         final Instance instance = parseInstance(request);
-        
+
+        // 将 namespaceId、serviceName、instance 传入
+        // 进行注册
         serviceManager.registerInstance(namespaceId, serviceName, instance);
+
         return "ok";
     }
     
@@ -156,7 +163,7 @@ public class InstanceController {
     @DeleteMapping
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public String deregister(HttpServletRequest request) throws Exception {
-        Instance instance = getIpAddress(request);
+        Instance instance =  getIpAddress(request);
         String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         NamingUtils.checkServiceNameFormat(serviceName);
@@ -375,6 +382,8 @@ public class InstanceController {
     /**
      * Get all instance of input service.
      *
+     * 获取 某服务的所有实例
+     *
      * @param request http request
      * @return list of instance
      * @throws Exception any error during list
@@ -382,14 +391,19 @@ public class InstanceController {
     @GetMapping("/list")
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.READ)
     public ObjectNode list(HttpServletRequest request) throws Exception {
-        
+
+        // 解析 namespaceId
         String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        // 解析 serviceName
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         NamingUtils.checkServiceNameFormat(serviceName);
-        
+        // 获取 agent
         String agent = WebUtils.getUserAgent(request);
+        // 解析 clusters
         String clusters = WebUtils.optional(request, "clusters", StringUtils.EMPTY);
+        // 解析 clientIp
         String clientIP = WebUtils.optional(request, "clientIP", StringUtils.EMPTY);
+        // 解析 udpPort
         int udpPort = Integer.parseInt(WebUtils.optional(request, "udpPort", "0"));
         String env = WebUtils.optional(request, "env", StringUtils.EMPTY);
         boolean isCheck = Boolean.parseBoolean(WebUtils.optional(request, "isCheck", "false"));
@@ -397,7 +411,8 @@ public class InstanceController {
         String app = WebUtils.optional(request, "app", StringUtils.EMPTY);
         
         String tenant = WebUtils.optional(request, "tid", StringUtils.EMPTY);
-        
+
+        //
         boolean healthyOnly = Boolean.parseBoolean(WebUtils.optional(request, "healthyOnly", "false"));
         
         return doSrvIpxt(namespaceId, serviceName, agent, clusters, clientIP, udpPort, env, isCheck, app, tenant,
@@ -579,16 +594,25 @@ public class InstanceController {
     }
     
     private Instance parseInstance(HttpServletRequest request) throws Exception {
-        
+
+        // 从请求中解析 serviceName
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+        // 解析 app
         String app = WebUtils.optional(request, "app", "DEFAULT");
+
+        // 获取 Instance
         Instance instance = getIpAddress(request);
+
         instance.setApp(app);
         instance.setServiceName(serviceName);
+
+
         // Generate simple instance id first. This value would be updated according to
         // INSTANCE_ID_GENERATOR.
         instance.setInstanceId(instance.generateInstanceId());
         instance.setLastBeat(System.currentTimeMillis());
+
+        // 解析  metadata 元数据
         String metadata = WebUtils.optional(request, "metadata", StringUtils.EMPTY);
         if (StringUtils.isNotEmpty(metadata)) {
             instance.setMetadata(UtilsAndCommons.parseMetadata(metadata));
@@ -600,19 +624,26 @@ public class InstanceController {
     }
     
     private Instance getIpAddress(HttpServletRequest request) {
-        
+
+        // 解析 enabled
         String enabledString = WebUtils.optional(request, "enabled", StringUtils.EMPTY);
+
+        // 将 enabled 解析为 boolean ，默认为 true
         boolean enabled;
         if (StringUtils.isBlank(enabledString)) {
             enabled = BooleanUtils.toBoolean(WebUtils.optional(request, "enable", "true"));
         } else {
             enabled = BooleanUtils.toBoolean(enabledString);
         }
-        
+
+        // 解析  weight 默认为 1
         String weight = WebUtils.optional(request, "weight", "1");
+        // 解析 healthy 默认为 true
         boolean healthy = BooleanUtils.toBoolean(WebUtils.optional(request, "healthy", "true"));
-        
+
+        // 将 ip、port、cluster、ephemeral 这些基础信息封装为 Instance
         Instance instance = getBasicIpAddress(request);
+        // 将 上面解析的信息 填充进去
         instance.setWeight(Double.parseDouble(weight));
         instance.setHealthy(healthy);
         instance.setEnabled(enabled);
@@ -621,16 +652,22 @@ public class InstanceController {
     }
     
     private Instance getBasicIpAddress(HttpServletRequest request) {
-        
+
+        // 解析 ip
         final String ip = WebUtils.required(request, "ip");
+        // 解析 port
         final String port = WebUtils.required(request, "port");
+        // 解析 cluster，默认为 ""，如果为空的话 给一个默认值 DEFAULT
         String cluster = WebUtils.optional(request, CommonParams.CLUSTER_NAME, StringUtils.EMPTY);
         if (StringUtils.isBlank(cluster)) {
             cluster = WebUtils.optional(request, "cluster", UtilsAndCommons.DEFAULT_CLUSTER_NAME);
         }
+
+        // 解析 ephemeral ，是否为临时节点，默认为 true
         boolean ephemeral = BooleanUtils.toBoolean(
                 WebUtils.optional(request, "ephemeral", String.valueOf(switchDomain.isDefaultInstanceEphemeral())));
-        
+
+        // 将上述信息 封装为 Instance
         Instance instance = new Instance();
         instance.setPort(Integer.parseInt(port));
         instance.setIp(ip);
@@ -668,15 +705,18 @@ public class InstanceController {
         
         ClientInfo clientInfo = new ClientInfo(agent);
         ObjectNode result = JacksonUtils.createEmptyJsonNode();
+
+        // 从 注册表 获取 service
         Service service = serviceManager.getService(namespaceId, serviceName);
+
         long cacheMillis = switchDomain.getDefaultCacheMillis();
         
         // now try to enable the push
+        // 尝试去开启 push
         try {
             if (udpPort > 0 && pushService.canEnablePush(agent)) {
                 
-                pushService
-                        .addClient(namespaceId, serviceName, clusters, agent, new InetSocketAddress(clientIP, udpPort),
+                pushService.addClient(namespaceId, serviceName, clusters, agent, new InetSocketAddress(clientIP, udpPort),
                                 pushDataSource, tid, app);
                 cacheMillis = switchDomain.getPushCacheMillis(serviceName);
             }
@@ -685,7 +725,9 @@ public class InstanceController {
                     .error("[NACOS-API] failed to added push client {}, {}:{}", clientInfo, clientIP, udpPort, e);
             cacheMillis = switchDomain.getDefaultCacheMillis();
         }
-        
+
+        // 如果 service 为空
+        // 构建 空的信息 返回
         if (service == null) {
             if (Loggers.SRV_LOG.isDebugEnabled()) {
                 Loggers.SRV_LOG.debug("no instance to serve for service: {}", serviceName);

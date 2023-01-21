@@ -76,7 +76,9 @@ public class ServerListManager extends MemberChangeListener {
     
     @PostConstruct
     public void init() {
+        //
         GlobalExecutor.registerServerStatusReporter(new ServerStatusReporter(), 2000);
+        //
         GlobalExecutor.registerServerInfoUpdater(new ServerInfoUpdater());
     }
     
@@ -204,7 +206,8 @@ public class ServerListManager extends MemberChangeListener {
                 long curTime = System.currentTimeMillis();
                 String status = LOCALHOST_SITE + "#" + EnvUtil.getLocalAddress() + "#" + curTime + "#" + weight
                         + "\r\n";
-                
+
+                // 获取所有的server
                 List<Member> allServers = getServers();
                 
                 if (!contains(EnvUtil.getLocalAddress())) {
@@ -231,15 +234,15 @@ public class ServerListManager extends MemberChangeListener {
                         
                         Message msg = new Message();
                         msg.setData(status);
-                        
+
+                        // 给其他server 发送心跳
                         synchronizer.send(server.getAddress(), msg);
                     }
                 }
             } catch (Exception e) {
                 Loggers.SRV_LOG.error("[SERVER-STATUS] Exception while sending server status", e);
             } finally {
-                GlobalExecutor
-                        .registerServerStatusReporter(this, switchDomain.getServerStatusSynchronizationPeriodMillis());
+                GlobalExecutor.registerServerStatusReporter(this, switchDomain.getServerStatusSynchronizationPeriodMillis());
             }
             
         }
