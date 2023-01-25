@@ -118,31 +118,43 @@ public class PushService implements ApplicationContextAware, ApplicationListener
     
     @Override
     public void onApplicationEvent(ServiceChangeEvent event) {
+        // 获取 service
         Service service = event.getService();
+        // 获取 serviceName
         String serviceName = service.getName();
+        // 获取 namespaceId
         String namespaceId = service.getNamespaceId();
-        
+
+        // 1 秒后执行这个任务
         Future future = GlobalExecutor.scheduleUdpSender(() -> {
             try {
                 Loggers.PUSH.info(serviceName + " is changed, add it to push queue.");
-                ConcurrentMap<String, PushClient> clients = clientMap
-                        .get(UtilsAndCommons.assembleFullServiceName(namespaceId, serviceName));
+
+
+                // 根据service 获取 客户端
+                ConcurrentMap<String, PushClient> clients = clientMap.get(UtilsAndCommons.assembleFullServiceName(namespaceId, serviceName));
                 if (MapUtils.isEmpty(clients)) {
                     return;
                 }
                 
                 Map<String, Object> cache = new HashMap<>(16);
                 long lastRefTime = System.nanoTime();
+
                 for (PushClient client : clients.values()) {
+                    // 客户端已经挂了
                     if (client.zombie()) {
                         Loggers.PUSH.debug("client is zombie: " + client.toString());
+                        // 移除
                         clients.remove(client.toString());
                         Loggers.PUSH.debug("client is zombie: " + client.toString());
                         continue;
                     }
-                    
+
+                    // 取出当前客户端需要的信息（只提供key）
+                    // 压缩后发送给客户端
                     Receiver.AckEntry ackEntry;
                     Loggers.PUSH.debug("push serviceName: {} to client: {}", serviceName, client.toString());
+
                     String key = getPushCacheKey(serviceName, client.getIp(), client.getAgent());
                     byte[] compressData = null;
                     Map<String, Object> data = null;
@@ -166,7 +178,8 @@ public class PushService implements ApplicationContextAware, ApplicationListener
                     Loggers.PUSH.info("serviceName: {} changed, schedule push for: {}, agent: {}, key: {}",
                             client.getServiceName(), client.getAddrStr(), client.getAgent(),
                             (ackEntry == null ? null : ackEntry.key));
-                    
+
+                    // 最后通过 udp的形式 给 客户端推送
                     udpPush(ackEntry);
                 }
             } catch (Exception e) {

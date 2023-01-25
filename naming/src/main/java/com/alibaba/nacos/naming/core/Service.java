@@ -294,7 +294,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      */
     public void init() {
         // 执行一个任务
-        // 5秒之后开始执行，并且每隔5秒 就执行一次 =>  clientBeatCheckTask（客户端心跳检查任务）
+        // 5秒之后开始执行，并且每隔5秒 执行一次 =>  clientBeatCheckTask（客户端心跳检查任务）
         //
         HealthCheckReactor.scheduleCheck(clientBeatCheckTask);
         // 获取 当前所有的 Cluster，然后进行设置和初始化

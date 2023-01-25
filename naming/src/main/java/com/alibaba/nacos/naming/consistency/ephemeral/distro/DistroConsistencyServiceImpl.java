@@ -102,7 +102,6 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
     
     @PostConstruct
     public void init() {
-        // 会初始化
         GlobalExecutor.submitDistroNotifyTask(notifier);
     }
     
@@ -427,7 +426,8 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
             try {
                 String datumKey = pair.getValue0();
                 DataOperation action = pair.getValue1();
-                
+
+                // services 集合就是用来记录当前正在排队处理的节点
                 services.remove(datumKey);
                 
                 int count = 0;

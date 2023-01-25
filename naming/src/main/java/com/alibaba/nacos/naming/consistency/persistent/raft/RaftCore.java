@@ -160,6 +160,7 @@ public class RaftCore implements Closeable {
     @PostConstruct
     public void init() throws Exception {
         Loggers.RAFT.info("initializing Raft sub-system");
+        // 记录启动时间
         final long start = System.currentTimeMillis();
         
         raftStore.loadDatums(notifier, datums);
@@ -171,8 +172,10 @@ public class RaftCore implements Closeable {
         initialized = true;
         
         Loggers.RAFT.info("finish to load data from disk, cost: {} ms.", (System.currentTimeMillis() - start));
-        
+
+        // 进行Master 选举 任务
         masterTask = GlobalExecutor.registerMasterElection(new MasterElection());
+        // 心跳 任务
         heartbeatTask = GlobalExecutor.registerHeartbeat(new HeartBeat());
         
         versionJudgement.registerObserver(isAllNewVersion -> {

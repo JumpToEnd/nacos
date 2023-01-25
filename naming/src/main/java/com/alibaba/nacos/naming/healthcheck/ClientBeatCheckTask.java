@@ -76,28 +76,41 @@ public class ClientBeatCheckTask implements Runnable {
     @Override
     public void run() {
         try {
+
+            // 判断当前服务器是否负责输入服务。
+            // 集群使用，只允许主节点删除
+            // 单机情况下肯定为 true
             if (!getDistroMapper().responsible(service.getName())) {
                 return;
             }
-            
+
+            // 当前节点如果不能执行 检查检查，就结束
             if (!getSwitchDomain().isHealthCheckEnabled()) {
                 return;
             }
-            
+
+
+            // 获取 service 内所有的实例
             List<Instance> instances = service.allIPs(true);
             
             // first set health status of instances:
             for (Instance instance : instances) {
+                // 如果 系统当前时间 - 实例上次心跳时间  >  15秒（健康状态默认超时时间）
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getInstanceHeartBeatTimeOut()) {
                     if (!instance.isMarked()) {
                         if (instance.isHealthy()) {
+                            // 将实例置为不健康
                             instance.setHealthy(false);
                             Loggers.EVT_LOG
                                     .info("{POS} {IP-DISABLED} valid: {}:{}@{}@{}, region: {}, msg: client timeout after {}, last beat: {}",
                                             instance.getIp(), instance.getPort(), instance.getClusterName(),
                                             service.getName(), UtilsAndCommons.LOCALHOST_SITE,
                                             instance.getInstanceHeartBeatTimeOut(), instance.getLastBeat());
+
+                            // 发布一个Spring 事件 ServiceChangeEvent
                             getPushService().serviceChanged(service);
+
+                            // 发布一个 Spring 事件 InstanceHeartbeatTimeoutEvent
                             ApplicationUtils.publishEvent(new InstanceHeartbeatTimeoutEvent(this, instance));
                         }
                     }
@@ -114,7 +127,9 @@ public class ClientBeatCheckTask implements Runnable {
                 if (instance.isMarked()) {
                     continue;
                 }
-                
+
+                // 如果 系统当前时间 - 上次心跳时间 > 30秒 （默认实例删除超时时间）
+                // 删除节点
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getIpDeleteTimeout()) {
                     // delete instance
                     Loggers.SRV_LOG.info("[AUTO-DELETE-IP] service: {}, ip: {}", service.getName(),
@@ -133,14 +148,20 @@ public class ClientBeatCheckTask implements Runnable {
         
         try {
             NamingProxy.Request request = NamingProxy.Request.newRequest();
-            request.appendParam("ip", instance.getIp()).appendParam("port", String.valueOf(instance.getPort()))
-                    .appendParam("ephemeral", "true").appendParam("clusterName", instance.getClusterName())
-                    .appendParam("serviceName", service.getName()).appendParam("namespaceId", service.getNamespaceId());
-            
+            request
+                    .appendParam("ip", instance.getIp())
+                    .appendParam("port", String.valueOf(instance.getPort()))
+                    .appendParam("ephemeral", "true")
+                    .appendParam("clusterName", instance.getClusterName())
+                    .appendParam("serviceName", service.getName())
+                    .appendParam("namespaceId", service.getNamespaceId());
+
+            // 拼装地址 http://127.0.0.1:port/nacos/v1/ns/instance?key=value
             String url = "http://" + IPUtil.localHostIP() + IPUtil.IP_PORT_SPLITER + EnvUtil.getPort() + EnvUtil.getContextPath()
                     + UtilsAndCommons.NACOS_NAMING_CONTEXT + "/instance?" + request.toUrl();
             
             // delete instance asynchronously:
+            // 异步请求url
             HttpClient.asyncHttpDelete(url, null, null, new Callback<String>() {
                 @Override
                 public void onReceive(RestResult<String> result) {
